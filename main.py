@@ -1,126 +1,132 @@
 import sys
 import os
-import PyQt5.QtWidgets as qt
-from PyQt5 import uic, QtGui
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAggBase as FigureCanvas
-import matplotlib.pyplot as plt
 import numpy as np
-import json
+import time
 
-from lissajousgen import LissajousGenerator, lissajous_figure
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton
+from PyQt5 import uic, QtGui
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
-
-# Настройки фигуры по умолчанию
-default_settings = {
-    "freq_x": 2,
-    "freq_y": 3,
-    "color": "midnightblue",
-    "width": 2
-}
+from matplotlib import pyplot
+from config import DEFAULT_SETTINGS, COLORS, VERSION
 
 
-# Цвета для matplotlib
-with open("mpl.json", mode="r") as f:
-    mpl_color_dict = json.load(f)
+class LissajousWindow(QMainWindow):
+    """ Окно приложения """
 
-
-class LissajousWindow(qt.QMainWindow):
     def __init__(self):
-        super(LissajousWindow, self).__init__()
+        super().__init__()
+        self._fc = None
+        self._fig = None
+        self._ax = None
+        self.make_window()
 
-        # Загружаем интерфейс из файла
+    def make_window(self):
+        """ Создание окна программы """
+
+        # Загружаем интерфейс окна из файла
         uic.loadUi("main_window.ui", self)
-
-        # Ставим версию и иконку
-        with open("version.txt", "r") as f:
-            version = f.readline()
-        self.setWindowTitle("Генератор фигур Лиссажу. Версия {}. CC BY-SA 4.0 Ivanov".format(
-            version
-        ))
-        scriptDir = os.path.dirname(os.path.realpath(__file__))
-        self.setWindowIcon(QtGui.QIcon(scriptDir + os.path.sep + "icon.bmp"))
+        # Устанавливаем заголовок окна
+        self.setWindowTitle(f"Генератор фигур Лиссажу. Версия {VERSION}. CC BY Soloduha S")
+        # Ставим иконку
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        self.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + "icon.bmp"))
 
         # Создаём холст matplotlib
-        self._fig = plt.figure(figsize=(4, 3), dpi=72)
+        self._fig = pyplot.figure(figsize=(4, 3), dpi=72)
         # Добавляем на холст matplotlib область для построения графиков.
         # В общем случае таких областей на холсте может быть несколько
         # Аргументы add_subplot() в данном случае:
         # ширина сетки, высота сетки, номер графика в сетке
         self._ax = self._fig.add_subplot(1, 1, 1)
-
+        #
         # Создаём qt-виджет холста для встраивания холста
         # matplotlib fig в окно Qt.
         self._fc = FigureCanvas(self._fig)
         # Связываем созданный холст c окном
         self._fc.setParent(self)
-        # Настраиваем размер и положение холста
-        self._fc.resize(400, 300)
-        self._fc.move(20, 20)
-
+        # Настраиваем размер холста
+        self._fc.resize(400, 270)
         # Первичное построение фигуры
         self.plot_lissajous_figure()
-
-        self.resize(650, 300)
 
         self.plot_button.clicked.connect(self.plot_button_click_handler)
         self.save_button.clicked.connect(self.save_button_click_handler)
 
-    def plot_button_click_handler(self):
-        """
-        Обработчик нажатия на кнопку применения настроек
-        """
-        # Получаем данные из текстовых полей
-        settings = {}
-
-        settings["freq_x"] = float(self.freq_x_lineedit.text())
-        settings["freq_y"] = float(self.freq_y_lineedit.text())
-        settings["color"] = mpl_color_dict[self.color_combobox.currentText()]
-        settings["width"] = int(self.width_combobox.currentText())
-
-        # Перестраиваем график
-        self.plot_lissajous_figure(settings)
-
-    def plot_lissajous_figure(self, settings=default_settings):
-        """
-        Обновление фигуры
-        """
+    def plot_lissajous_figure(self, settings=None):
+        """ Обновление/создание фигуры """
+        if settings is None:
+            settings = DEFAULT_SETTINGS
         # Удаляем устаревшие данные с графика
         for line in self._ax.lines:
             line.remove()
 
-        # Генерируем сигнал для построения
-        self.generator = LissajousGenerator()
-        figure = self.generator.generate_figure(settings["freq_x"],
-                                                settings["freq_y"])
+        # Создаем фигуру
+        figure = LissajousFigure(settings["freq_x"], settings["freq_y"])
 
         # Строим график
         self._ax.plot(figure.x_arr, figure.y_arr,
                       color=settings["color"], linewidth=settings["width"])
 
-        plt.axis("off")
-
-        # Нужно, чтобы все элементы не выходили за пределы холста
-        plt.tight_layout()
+        # Скрываем линейку
+        pyplot.axis("off")
 
         # Обновляем холст в окне
         self._fc.draw()
 
+    def get_settings(self):
+        """ Получение данных из текстовых полей """
+        figures_setting = {"freq_x": float(self.freq_x_lineedit.text()),
+                           "freq_y": float(self.freq_y_lineedit.text()),
+                           "color": COLORS[self.color_combobox.currentText()],
+                           "width": int(self.width_combobox.currentText())}
+
+        return figures_setting
+
+    def plot_button_click_handler(self):
+        """ Обработчик кнопки 'Обновить фигуру' """
+        # Получаем данные из текстовых полей
+        settings = self.get_settings()
+        # Перестраиваем график
+        self.plot_lissajous_figure(settings)
+
     def save_button_click_handler(self):
-        """
-        Обработчик нажатия на кнопку сохранения настроек
-        """
-        file_path, _ = qt.QFileDialog.getSaveFileName(self, "Сохранение изображения", "C:\\",
-                                                            "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
+        """ Обработчик кнопки 'Сохранить фигуру в файл' """
+        # Задаем путь сохранения файла по умолчанию (в загрузки)
+        test_path_default = os.path.expanduser('~/Downloads')
+        # Получаем данные из текстовых полей
+        settings = self.get_settings()
+        # Задаем имя файла по умолчанию
+        file_name = f'lissajous_{settings["freq_x"]}_{settings["freq_y"]}_{settings["color"]}_{settings["width"]}'
+        test_path_default = os.path.abspath(f'{test_path_default}/{file_name}')
+        file_path, _ = QFileDialog.getSaveFileName(self, "Сохранение изображения", f"{test_path_default}",
+                                                   "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
+        self._fig.savefig(file_path)
 
-        if file_path == "":
-            return
 
-        raise NotImplementedError("Тут всего одной строчки не хватает.")
+class LissajousFigure:
+    """
+    Класс Фигуры Лиссажу.
+    Задаётся набором точек с координатами x и y.
+
+    """
+
+    def __init__(self, x_array, y_array, resolution=20):
+        self.resolution = resolution
+        t = np.linspace(0, 2 * np.pi, self.resolution)
+        self.x_arr = np.sin(x_array * t)
+        self.y_arr = np.cos(y_array * t)
+        # Эта задержка эмулирует процедуру инициализации следующей версии генератора.
+        # Задержка будет убрана после обновления.
+        # Пока не трогать.
+        # P.S. В новом генераторе задержка будет только при инициализации.
+        # Фигуры будут генерироваться так же быстро, как и сейчас.
+        time.sleep(1)
 
 
 if __name__ == "__main__":
     # Инициализируем приложение Qt
-    app = qt.QApplication(sys.argv)
+    app = QApplication(sys.argv)
 
     # Создаём и настраиваем главное окно
     main_window = LissajousWindow()
