@@ -10,7 +10,26 @@
 
 Запуск:
 
+* Скачайте программу с формате ZIP
+* Скопируйте путь к папке Lissajous_test-main (далее "путь к папке")
+* Установите необходимые компоненты и программу через консоль:
+
 ```
+cd "путь к папке" 
+(Например cd "путь к папке" /Users/apple/Downloads/Lissajous_test-main)
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install --upgrade pip
+python main.py
+
+```
+
+Для дальнейшего запуска используйте: 
+```
+cd "путь к папке" 
+(Например cd "путь к папке" /Users/apple/Downloads/Lissajous_test-main)
+source venv/bin/activate
 python main.py
 ```
 
