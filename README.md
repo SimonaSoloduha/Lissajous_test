@@ -22,14 +22,32 @@
 ```
 cd "путь к папке" 
 (Например cd "путь к папке" /Users/apple/Downloads/Lissajous_test-main)
+
+```
+Для Windows:
+```
+bash install.bat
+```
+Для Linux/macOs:
+```
 bash install.sh
 
 ```
 
+
 Для дальнейшего запуска используйте: 
+
 ```
 cd "путь к папке" 
 (Например cd "путь к папке" /Users/apple/Downloads/Lissajous_test-main)
+```
+
+Для Windows:
+```
+bash run.bat
+```
+Для Linux/macOs:
+```
 bash run.sh
 ```
 
