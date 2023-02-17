@@ -1,4 +1,3 @@
-# Настройки фигуры по умолчанию
 DEFAULT_SETTINGS = {
     "freq_x": 5,
     "freq_y": 1,
@@ -6,7 +5,6 @@ DEFAULT_SETTINGS = {
     "width": 1,
 }
 
-# цвета
 COLORS = {
     "Красный": "crimson",
     "Зелёный": "navy",
@@ -14,5 +12,4 @@ COLORS = {
     "Синий": "midnightblue"
 }
 
-# версия
 VERSION = '0.1.2023.02'
