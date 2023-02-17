@@ -5,9 +5,8 @@ import time
 from PyQt5.QtWidgets import QMainWindow, QFileDialog, QPushButton, QComboBox, QLineEdit
 from PyQt5 import uic, QtGui
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-
 from matplotlib import pyplot
-from config import DEFAULT_SETTINGS, COLORS, VERSION
+from config import DEFAULT_SETTINGS, COLORS, VERSION, WIDTH_VARIABLES, IMG_FORMATS
 
 
 class LissajousWindow(QMainWindow):
@@ -15,6 +14,10 @@ class LissajousWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.figure = None
+        self.axes = None
+        self.figure_canvas = None
+
         self.statusbar = None
         self.save_button = None
         self.update_button = None
@@ -22,13 +25,31 @@ class LissajousWindow(QMainWindow):
         self.freq_y_lineedit = None
         self.color_combobox = None
         self.width_combobox = None
-        self._fc = None
-        self._fig = None
-        self._ax = None
         self.make_window()
 
     def make_window(self):
         """ Создание окна программы """
+        # создание окна
+        self.create_interface()
+        # поле ввода 'Частота X (a)'
+        self.create_freq_x_lineedit()
+        # поле ввода 'Частота Y (b)'
+        self.create_freq_y_lineedit()
+        # поле выбора цвета
+        self.create_color_combobox()
+        # поле выбора толщины
+        self.create_width_combobox()
+        # кнопка 'Обновить фигуру'
+        self.create_update_button()
+        # кнопка 'Сохранить фигуру в файл'
+        self.create_save_button()
+        # Область построения фигуры
+        self.create_figure_and_axes()
+        self.create_figure_canvas()
+        # Первичное построение фигуры
+        self.draw_lissajous_figure()
+
+    def create_interface(self):
         # Загружаем интерфейс окна из файла
         uic.loadUi("view/main_window.ui", self)
         # заголовок окна
@@ -38,32 +59,19 @@ class LissajousWindow(QMainWindow):
         # иконка
         self.setWindowIcon(QtGui.QIcon("img/icon-2.png"))
 
-        # Создаём холст matplotlib
-        self._fig = pyplot.figure(figsize=(4, 3), dpi=72)
-        # Добавляем на холст matplotlib область для построения графиков.
-        # В общем случае таких областей на холсте может быть несколько
-        # Аргументы add_subplot() в данном случае:
-        # ширина сетки, высота сетки, номер графика в сетке
-        self._ax = self._fig.add_subplot(1, 1, 1)
-        #
-        # Создаём qt-виджет холста для встраивания холста
-        # matplotlib fig в окно Qt.
-        self._fc = FigureCanvas(self._fig)
-        # Связываем созданный холст c окном
-        self._fc.setParent(self)
-        # Настраиваем размер холста
-        self._fc.resize(400, 270)
-        # Первичное построение фигуры
-        self.plot_lissajous_figure()
-
+    def create_freq_x_lineedit(self):
+        """Создание поля ввода 'Частота X (a)'"""
         self.freq_x_lineedit = QLineEdit(self)
         self.formLayout.addRow('Частота X (a)', self.freq_x_lineedit)
         self.freq_x_lineedit.setText(str(DEFAULT_SETTINGS['freq_x']))
 
+    def create_freq_y_lineedit(self):
         self.freq_y_lineedit = QLineEdit(self)
+        """Создание поля ввода 'Частота Y (b)'"""
         self.formLayout.addRow('Частота Y (b)', self.freq_y_lineedit)
         self.freq_y_lineedit.setText(str(DEFAULT_SETTINGS['freq_y']))
 
+    def create_color_combobox(self):
         self.color_combobox = QComboBox(self)
         self.color_combobox.addItems(COLORS.keys())
 
@@ -75,47 +83,66 @@ class LissajousWindow(QMainWindow):
         self.color_combobox.setCurrentIndex(default_color_index)
         self.formLayout.addRow('Цвет линии', self.color_combobox)
 
-        width_variables = [
-            '1', '2', '3', '4'
-        ]
-        default_width = width_variables.index(str(DEFAULT_SETTINGS['width']))
+    def create_width_combobox(self):
+        default_width = WIDTH_VARIABLES.index(str(DEFAULT_SETTINGS['width']))
         self.width_combobox = QComboBox(self)
-        self.width_combobox.addItems(width_variables)
+        self.width_combobox.addItems(WIDTH_VARIABLES)
         self.width_combobox.setCurrentIndex(default_width)
         self.formLayout.addRow('Толщина линии', self.width_combobox)
 
+    def create_update_button(self):
         self.update_button = QPushButton(self)
         self.update_button.setText('Обновить фигуру')
         self.formLayout.addRow(self.update_button)
+        self.update_button.clicked.connect(self.update_button_click_handler)
 
+    def create_save_button(self):
         self.save_button = QPushButton(self)
         self.save_button.setText('Сохранить фигуру в файл')
         self.formLayout.addRow(self.save_button)
-
-        self.update_button.clicked.connect(self.update_button_click_handler)
-        # self.update_button.clicked.connect(self.plot_button_click_handler)
         self.save_button.clicked.connect(self.save_button_click_handler)
 
-    def plot_lissajous_figure(self, settings=None):
+    def create_figure_and_axes(self):
+        """Создание Figure с одной областью Axes"""
+        self.figure, self.axes = pyplot.subplots()
+
+    def create_figure_canvas(self):
+        """Создание FigureCanvas """
+        # Создаём qt-виджет холста для встраивания холста
+        # matplotlib fig в окно Qt.
+        self.figure_canvas = FigureCanvas(self.figure)
+        # Связываем созданный холст c окном
+        self.figure_canvas.setParent(self)
+        # Настраиваем размер холста
+        self.figure_canvas.resize(400, 270)
+
+    def create_lissajous_figure(self, settings):
+        t = np.linspace(0, 2 * np.pi, 100)
+        x = settings["freq_x"]
+        y = settings["freq_y"]
+        color = settings["color"]
+        width = settings["width"]
+        self.axes.plot(np.sin(x * t), np.cos(y * t),
+                       color=color, linewidth=width)
+        # Эта задержка эмулирует процедуру инициализации следующей версии генератора.
+        # Задержка будет убрана после обновления.
+        # Пока не трогать.
+        # P.S. В новом генераторе задержка будет только при инициализации.
+        # Фигуры будут генерироваться так же быстро, как и сейчас.
+        time.sleep(1)
+
+    def draw_lissajous_figure(self, settings=DEFAULT_SETTINGS):
         """ Обновление/создание фигуры """
-        if settings is None:
-            settings = DEFAULT_SETTINGS
-        # Удаляем устаревшие данные с графика
-        for line in self._ax.lines:
-            line.remove()
-
+        # Очищам холст
+        self.axes.cla()
         # Создаем фигуру
-        figure = LissajousFigure(settings["freq_x"], settings["freq_y"])
-
-        # Строим график
-        self._ax.plot(figure.x_arr, figure.y_arr,
-                      color=settings["color"], linewidth=settings["width"])
-
+        self.create_lissajous_figure(settings)
+        # Устанавливаем aspect ratio равный 1 (квадратный)
+        self.axes.set_aspect(1)
         # Скрываем линейку
         pyplot.axis("off")
-
         # Обновляем холст в окне
-        self._fc.draw()
+        self.figure_canvas.draw()
 
     def get_settings(self):
         """ Получение данных из текстовых полей """
@@ -131,11 +158,11 @@ class LissajousWindow(QMainWindow):
         # Получаем данные из текстовых полей
         settings = self.get_settings()
         # Перестраиваем график
-        self.plot_lissajous_figure(settings)
+        self.draw_lissajous_figure(settings)
 
     def save_button_click_handler(self):
         """ Обработчик кнопки 'Сохранить фигуру в файл' """
-        # Задаем путь сохранения файла по умолчанию (в загрузки)
+        # Путь сохранения файла по умолчанию (в загрузки)
         test_path_default = os.path.expanduser('~/Downloads')
         # Получаем данные из текстовых полей
         settings = self.get_settings()
@@ -143,24 +170,5 @@ class LissajousWindow(QMainWindow):
         file_name = f'lissajous_{settings["freq_x"]}_{settings["freq_y"]}_{settings["color"]}_{settings["width"]}'
         test_path_default = os.path.abspath(f'{test_path_default}/{file_name}')
         file_path, _ = QFileDialog.getSaveFileName(self, "Сохранение изображения", f"{test_path_default}",
-                                                   "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
-        self._fig.savefig(file_path)
-
-
-class LissajousFigure:
-    """
-    Класс Фигуры Лиссажу.
-    Задаётся набором точек с координатами x и y.
-
-    """
-    def __init__(self, x_array, y_array, resolution=20):
-        self.resolution = resolution
-        t = np.linspace(0, 2 * np.pi, self.resolution)
-        self.x_arr = np.sin(x_array * t)
-        self.y_arr = np.cos(y_array * t)
-        # Эта задержка эмулирует процедуру инициализации следующей версии генератора.
-        # Задержка будет убрана после обновления.
-        # Пока не трогать.
-        # P.S. В новом генераторе задержка будет только при инициализации.
-        # Фигуры будут генерироваться так же быстро, как и сейчас.
-        time.sleep(1)
+                                                   ';;'.join(IMG_FORMATS))
+        self.figure.savefig(file_path)

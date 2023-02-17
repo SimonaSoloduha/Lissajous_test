@@ -22,11 +22,7 @@
 ```
 cd "путь к папке" 
 (Например cd "путь к папке" /Users/apple/Downloads/Lissajous_test-main)
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pip install --upgrade pip
-python main.py
+bash install.sh
 
 ```
 
@@ -34,8 +30,7 @@ python main.py
 ```
 cd "путь к папке" 
 (Например cd "путь к папке" /Users/apple/Downloads/Lissajous_test-main)
-source venv/bin/activate
-python main.py
+bash run.sh
 ```
 
 Для удобства работы имеет смысл использовать виртуальные окружения.

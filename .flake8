@@ -1,5 +1,8 @@
 [flake8]
-exclude = .git,__pycache__,venv
+exclude =
+    .git
+    __pycache__
+    venv
 inline-quotes = double
 multiline-quotes = """
 builtins = _
